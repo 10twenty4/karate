@@ -121,6 +121,7 @@ public class XmlUtils {
 
     public static Document toXmlDoc(String xml) {
         DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
+        factory.setNamespaceAware(true);
         try {
             DocumentBuilder builder = factory.newDocumentBuilder();
             DtdEntityResolver dtdEntityResolver = new DtdEntityResolver();
@@ -288,6 +289,19 @@ public class XmlUtils {
         return map;
     }
 
+    private static Map<String, Object> getAttributesExceptNamespace(Node node) {
+        NamedNodeMap attribs = node.getAttributes();
+        int attribCount = attribs.getLength();
+        Map<String, Object> map = new LinkedHashMap<>(attribCount);
+        for (int j = 0; j < attribCount; j++) {
+            Node attrib = attribs.item(j);
+            if(!("xmlns".equals(attrib.getNodeName()) || "xmlns".equals(attrib.getPrefix()))) {
+                map.put(attrib.getNodeName(), attrib.getNodeValue());
+            }
+        }
+        return map;
+    }
+
     public static int getChildElementCount(Node node) {
         NodeList nodes = node.getChildNodes();
         int childCount = nodes.getLength();
@@ -335,6 +349,40 @@ public class XmlUtils {
         return map;
     }
 
+    private static Object getElementAsObjectNamespaced(Node node) {
+        int childElementCount = getChildElementCount(node);
+        if (childElementCount == 0) {
+            return StringUtils.trimToNull(node.getTextContent());
+        }
+        Map<String, Object> map = new LinkedHashMap<>(childElementCount);
+        NodeList nodes = node.getChildNodes();
+        int childCount = nodes.getLength();
+        for (int i = 0; i < childCount; i++) {
+            Node child = nodes.item(i);
+            if (child.getNodeType() != Node.ELEMENT_NODE) {
+                continue;
+            }
+            String childName = child.getNamespaceURI() != null ? child.getNamespaceURI() + ":" + child.getLocalName() : child.getNodeName();
+            Object childValue = toObjectNamespaced(child);
+            // auto detect repeating elements
+            if (map.containsKey(childName)) {
+                Object temp = map.get(childName);
+                if (temp instanceof List) {
+                    List list = (List) temp;
+                    list.add(childValue);
+                } else {
+                    List list = new ArrayList(childCount);
+                    map.put(childName, list);
+                    list.add(temp);
+                    list.add(childValue);
+                }
+            } else {
+                map.put(childName, childValue);
+            }
+        }
+        return map;
+    }
+
     public static Object toObject(Node node) {
         if (node.getNodeType() == Node.DOCUMENT_NODE) {
             node = node.getFirstChild();
@@ -347,6 +395,26 @@ public class XmlUtils {
             Map<String, Object> wrapper = new LinkedHashMap<>(2);
             wrapper.put("_", value);
             wrapper.put("@", getAttributes(node));
+            return wrapper;
+        } else {
+            return value;
+        }
+    }
+
+    public static Object toObjectNamespaced(Node node) {
+        if (node.getNodeType() == Node.DOCUMENT_NODE) {
+            node = node.getFirstChild();
+            Map<String, Object> map = new LinkedHashMap<>(1);
+            //for Matching purposes
+            String name = node.getNamespaceURI() != null ? node.getNamespaceURI() + ":" + node.getLocalName() : node.getNodeName();
+            map.put(name, toObjectNamespaced(node));
+            return map;
+        }
+        Object value = getElementAsObjectNamespaced(node);
+        if (node.hasAttributes()) {
+            Map<String, Object> wrapper = new LinkedHashMap<>(2);
+            wrapper.put("_", value);
+            wrapper.put("@", getAttributesExceptNamespace(node));
             return wrapper;
         } else {
             return value;
@@ -406,6 +474,7 @@ public class XmlUtils {
 
     public static Document newDocument() {
         DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
+        factory.setNamespaceAware(true);
         DocumentBuilder builder;
         try {
             builder = factory.newDocumentBuilder();

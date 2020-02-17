@@ -1010,12 +1010,12 @@ public class Script {
         switch (expected.getType()) {
             case XML: // convert to map and then compare               
                 Node expNode = expected.getValue(Node.class);
-                expObject = XmlUtils.toObject(expNode);
-                actObject = XmlUtils.toObject(actual.getValue(Node.class));
+                expObject = XmlUtils.toObjectNamespaced(expNode);
+                actObject = XmlUtils.toObjectNamespaced(actual.getValue(Node.class));
                 break;
             case MAP: // expected is already in map form, convert the actual also
                 expObject = expected.getValue(Map.class);
-                actObject = XmlUtils.toObject(actual.getValue(Node.class));
+                actObject = XmlUtils.toObjectNamespaced(actual.getValue(Node.class));
                 break;
             case JSON: // special case - xpath expected to result in node-list
                 expObject = expected.getValue(DocumentContext.class).read("$");
